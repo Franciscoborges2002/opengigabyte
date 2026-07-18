@@ -12,6 +12,11 @@
 #include <linux/device.h>
 #include <linux/acpi.h>
 #include "gigabytekbd_driver.h"
+#include <linux/version.h>
+#include <linux/i2c.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(7, 0, 0)
+#include <linux/fb.h>
+#endif
 
 MODULE_AUTHOR("Hemanth Bollamreddi <blmhemu@gmail.com>");
 MODULE_DESCRIPTION("HID Keyboard driver for Gigabyte Keyboards.");
@@ -37,7 +42,14 @@ struct device* gigabyte_kbd_touchpad_device;
 
 static inline int gigabyte_kbd_is_backlight_off(void)
 {
+	if (!gigabyte_kbd_backlight_device)
+		return 1;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0)
+	return backlight_is_blank(gigabyte_kbd_backlight_device);
+#else
 	return gigabyte_kbd_backlight_device->props.power == FB_BLANK_POWERDOWN;
+#endif
 }
 
 static void gigabyte_kbd_backlight_toggle(struct work_struct* s)
@@ -87,7 +99,11 @@ static int gigabyte_kbd_raw_event(struct hid_device *hdev, struct hid_report *re
 				return 0;
 
 			rd[0] = 0x03;rd[1] = 0x70;rd[2] = 0x00;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0)
+			hid_report_raw_event(hdev, HID_INPUT_REPORT, rd, 4, 4, 0);
+#else
 			hid_report_raw_event(hdev, HID_INPUT_REPORT, rd, 4, 0);
+#endif
 			rd[0] = 0x03;rd[1] = 0x00;rd[2] = 0x00;
 			return 1;
 		case HIDRAW_FN_F4:
@@ -95,7 +111,11 @@ static int gigabyte_kbd_raw_event(struct hid_device *hdev, struct hid_report *re
 				return 0;
 
 			rd[0] = 0x03;rd[1] = 0x6f;rd[2] = 0x00;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0)
+			hid_report_raw_event(hdev, HID_INPUT_REPORT, rd, 4, 4, 0);
+#else
 			hid_report_raw_event(hdev, HID_INPUT_REPORT, rd, 4, 0);
+#endif
 			rd[0] = 0x03;rd[1] = 0x00;rd[2] = 0x00;
 			return 1;
 		case HIDRAW_FN_F6:
@@ -158,7 +178,7 @@ static int gigabyte_kbd_probe(struct hid_device *hdev, const struct hid_device_i
 
  	gigabyte_kbd_backlight_device = backlight_device_get_by_name(GIGABYTE_KBD_BACKLIGHT_DEVICE_NAME);
 	gigabyte_kbd_touchpad_device = bus_find_device(&i2c_bus_type, NULL, NULL, gigabyte_kbd_match_touchpad_device);
-	
+
 	if (gigabyte_kbd_touchpad_device)
 	{
 		gigabyte_kbd_touchpad_driver = gigabyte_kbd_touchpad_device->driver;
